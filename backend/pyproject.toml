@@ -1,0 +1,13 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.116.1",
+    "loguru>=0.7.3",
+    "mavsdk==2.6.0",
+    "python-socketio[asgi]>=5.13.0",
+    "uvicorn>=0.35.0",
+]

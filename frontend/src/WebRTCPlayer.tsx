@@ -1,34 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { RingLoader } from "react-spinners";
+import { HashLoader, RingLoader } from "react-spinners";
 
 import { toast } from "sonner";
-function getScaledPosition(
-  clientX: number,
-  clientY: number,
-  canvas: HTMLCanvasElement
-) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
 
-  return {
-    mouseX: (clientX - rect.left) * scaleX,
-    mouseY: (clientY - rect.top) * scaleY,
-  };
-}
 const WebRTCPlayer: React.FC<{ stream: string }> = ({ stream }) => {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
-  const isDrawing = useRef(false);
-  const startX = useRef(NaN);
-  const startY = useRef(NaN);
-  const rectX = useRef(NaN);
-  const rectY = useRef(NaN);
-  const rectWidth = useRef(NaN);
-  const rectHeight = useRef(NaN);
-  const [confirmFollow, setConfirmFollow] = useState(false);
   const isCancelled = useRef(false);
+
   // const socket = useSocket(DETECTIONS_URL, "/ws/detections", {
   //   streamId: stream,
   // });
@@ -46,70 +26,18 @@ const WebRTCPlayer: React.FC<{ stream: string }> = ({ stream }) => {
       console.log(state);
     };
     const videoElement = document.createElement("video");
-    const canvasElement = document.createElement("canvas");
-    const context = canvasElement.getContext("2d");
 
     videoElement.classList.add("w-full");
-    videoElement.classList.add("max-h-full");
-    videoElement.classList.add("object-contain");
+    videoElement.classList.add("h-full");
+    videoElement.classList.add("object-cover");
 
-    canvasElement.classList.add("w-full");
-    canvasElement.classList.add("max-h-full");
-    canvasElement.classList.add("object-contain");
+    // videoElement.addEventListener("play", function () {
+    //   // Adjust canvas size to match the video size
+    //   canvasElement.width = videoElement.videoWidth;
+    //   canvasElement.height = videoElement.videoHeight;
 
-    canvasElement.addEventListener("click", function (e) {
-      const { mouseX, mouseY } = getScaledPosition(
-        e.clientX,
-        e.clientY,
-        canvasElement
-      );
-      console.log(mouseX, mouseY);
-      setConfirmFollow(true);
-      // isDrawing.current = false; // Finish the rectangle drawing
-      // setConfirmFollow(true);
-    });
-
-    videoElement.addEventListener("play", function () {
-      // Adjust canvas size to match the video size
-      canvasElement.width = videoElement.videoWidth;
-      canvasElement.height = videoElement.videoHeight;
-
-      // Call the function to draw the video frame on the canvas
-      drawFrame();
-    });
-
-    function drawFrame() {
-      if (videoElement.paused || videoElement.ended) return; // Stop if the video is paused or ended
-
-      // Draw the current video frame on the canvas
-      if (context) {
-        context.drawImage(
-          videoElement,
-          0,
-          0,
-          canvasElement.width,
-          canvasElement.height
-        );
-        if (
-          isDrawing &&
-          rectX.current &&
-          rectY.current &&
-          rectWidth.current &&
-          rectHeight.current
-        ) {
-          context.fillStyle = "rgba(255, 0, 0, 0.5)"; // Set the fill color (red with 50% opacity)
-          context.fillRect(
-            rectX.current,
-            rectY.current,
-            rectWidth.current,
-            rectHeight.current
-          ); // Draw the rectangle
-        }
-      }
-
-      // Call drawFrame again to keep updating the canvas
-      requestAnimationFrame(drawFrame);
-    }
+    //   // Call the function to draw the video frame on the canvas
+    // });
 
     // element.classList.add("h-full");
     videoElement.autoplay = true;
@@ -120,7 +48,6 @@ const WebRTCPlayer: React.FC<{ stream: string }> = ({ stream }) => {
         if (videoContainerRef.current) {
           videoElement.play();
           videoContainerRef.current.replaceChildren(videoElement);
-          // videoContainerRef.current.replaceChildren(canvasElement);
         }
       };
       videoElement.srcObject = event.streams[0];
@@ -188,9 +115,9 @@ const WebRTCPlayer: React.FC<{ stream: string }> = ({ stream }) => {
   }, [stream]);
 
   return (
-    <div className="relative w-full h-full bg-transparent flex">
+    <div className="absolute  w-full  sm:w-4/12 md:w-3/12 top-0 sm:top-4 left-0 sm:left-4 z-10 opacity-80 aspect-video bg-transparent flex rounded-lg overflow-hidden">
       <div
-        className="w-full h-full bg-gray-900 flex items-center  justify-center"
+        className="w-full h-full bg-gray-400 flex items-center  justify-center"
         ref={videoContainerRef}
       >
         {error ? (
@@ -200,7 +127,10 @@ const WebRTCPlayer: React.FC<{ stream: string }> = ({ stream }) => {
               : error}
           </p>
         ) : (
-          <RingLoader size={90} color="#fff" />
+          <div className="flex flex-col items-center text-white gap-8 text-2xl">
+            <HashLoader size={50} color="#fff" />
+            <p>Loading Video...</p>
+          </div>
         )}
       </div>
     </div>

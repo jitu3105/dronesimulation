@@ -46,7 +46,7 @@ function App() {
       <Card className="relative w-screen h-screen p-0 rounded-none border-none">
         {socket && socket.id && (
           <>
-            <WebRTCPlayer stream={socket.id} />
+            {/*<WebRTCPlayer stream={socket.id} />*/}
             <ThreeDWorld state={state} />
             {/* <ThreeDWorld /> */}
             {/* <Telem state={state} dispatch={dispatch} /> */}

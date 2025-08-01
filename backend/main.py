@@ -26,7 +26,7 @@ redis_listener_task = None
 
 
 # Allowed origins
-origins = ["http://localhost:5173","http://192.168.1.11:5173","http://192.168.1.91:5173"]
+origins = ["http://localhost:5173","http://192.168.1.11:5173","http://192.168.1.91:5173","http://jalajghuge.co.in:5173"]
 
 # Create the drone instance
 drone:System = System(port=5052)

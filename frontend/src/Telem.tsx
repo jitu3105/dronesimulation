@@ -1,19 +1,20 @@
-import React, { useEffect, useReducer, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card } from "./components/ui/card";
-import io, { Socket } from "socket.io-client";
 import { Joystick, JoystickShape } from "react-joystick-component";
 import { toast } from "sonner";
-const SOCKET_URL = `http://${location.hostname}:8000`; // Adjust if your server runs on a different port
 import type { MapRef } from "react-map-gl/maplibre";
 import { Map, Marker } from "react-map-gl/maplibre";
 import Pin from "./Pin";
 import { Send } from "lucide-react";
+import { Socket } from "socket.io-client";
 
 const Telem: React.FC<{
   state: any;
+  socket: Socket;
   // dispatch: Function
 }> = ({
   state,
+  socket,
   // dispatch,
 }) => {
   const mapRef = useRef<MapRef>(null);
@@ -27,17 +28,7 @@ const Telem: React.FC<{
     fwd: number;
     yaw: number;
   }>({ rgt: 0, fwd: 0, yaw: 0, dwn: 0 });
-  const [socket, setSocket] = useState<Socket>();
-  useEffect(() => {
-    // const a = new Set();
-    const skt = io(SOCKET_URL, {
-      path: "/ws/socket.io", // 👈 Must match FastAPI mount path + socket.io suffix
-      transports: ["websocket"], // Optional, avoid long-polling
-    });
-    skt.on("connect", () => {
-      setSocket(skt);
-    });
-  }, []);
+
   useEffect(() => {
     const telemUpdater = (data: any) => {
       // console.log(mapRef);

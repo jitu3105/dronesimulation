@@ -1,0 +1,20 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "docker>=7.1.0",
+    "empy>=4.2",
+    "fastapi>=0.116.1",
+    "jinja2>=3.1.6",
+    "jsonschema>=4.25.0",
+    "kconfiglib>=14.1.0",
+    "loguru>=0.7.3",
+    "mavsdk==2.6.0",
+    "pyros-genmsg>=0.5.8",
+    "python-socketio[asgi]>=5.13.0",
+    "pyyaml>=6.0.2",
+    "uvicorn>=0.35.0",
+]

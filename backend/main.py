@@ -10,12 +10,19 @@ from src.telem import streamTelem ,fetchArmed, fetchMode
 import subprocess
 import os
 import time
+import uuid
+import docker
+import redis.asyncio as redis
+import json
+
 
 
 sim_process = None
 mediamtx_process = None
 gst_process = None
 last_command_time=None
+
+redis_listener_task = None
 
 
 # Allowed origins
@@ -67,25 +74,62 @@ sio = socketio.AsyncServer(
 # To keep per-client tracking info
 client_tracking = {}
 
+r = redis.Redis(host="dronesim-redis", port=6379, db=0)
+
+
+async def telem_listener(sio):
+    pubsub = r.pubsub()
+    await pubsub.psubscribe("telem:*")
+    logger.info("✅ Subscribed to telem:* channels")
+
+    try:
+        async for message in pubsub.listen():
+            if message["type"] == "pmessage":
+                room=message["channel"].decode("utf-8")
+                data=message['data'].decode("utf-8")
+                # logger.info(f"📡 {room}: {data}")
+                data=json.loads(data)
+                await sio.emit("telem", data, room=room)
+    except asyncio.CancelledError:
+        logger.warning("🛑 Redis listener cancelled")
+    finally:
+        logger.error("===============FINALLY OF TELEM LISTENER===============")
+        await pubsub.close()
+
+
 @sio.event
 async def connect(sid, environ):
-    print(f'Client connected: {sid}')
-    client_tracking[sid] = {
-        'last_time': time.time(),
-        'tracking': False,
-        'task': None
-    }
     logger.info(f"Socket connected: {sid}")
+    logger.info(f"creating a simulation for {sid}")
+    await sio.save_session(sid, {"room": f"telem:{sid}"})
+    await sio.enter_room(sid, f"telem:{sid}")
+    client = docker.from_env()
+    droneId=sid
+    container_name = f"drone-sim-{sid}"
+    logger.info(container_name)
+    try:
+        client.containers.run(
+            image="px4-typhoon",
+            name=container_name,
+            network="drone-sim-network",
+            detach=True,
+            remove=True,
+            environment={
+                "DRONE_ID": droneId
+            },
+        )
+    except Exception as e:
+        logger.error(e)
+
 
 
 @sio.event
 async def disconnect(sid):
     print(f'Client disconnected: {sid}')
-    if sid in client_tracking:
-        task = client_tracking[sid]['task']
-        if task:
-            task.cancel()
-        del client_tracking[sid]
+    client = docker.from_env()
+    container = client.containers.get(f"drone-sim-{sid}")  # use container name or ID
+    container.kill()  # force stop immediately
+    print("Container forcefully stopped.")
     logger.info(f"Socket disconnected: {sid}")
 
 
@@ -149,52 +193,36 @@ app = socketio.ASGIApp(
 # You can optionally connect the drone and start telemetry here
 @fastapi_app.on_event("startup")
 async def on_startup():
+    global redis_listener_task
     logger.info("application is starting up")
-    logger.info("starting the drone sim ")
-    subprocess.run(["pkill", "-f", "px4"])
-    env = os.environ.copy()
-    
-    env["HEADLESS"] = "1"
-    sim_process = await asyncio.create_subprocess_exec(
-        "make", "px4_sitl", "gazebo-classic_typhoon_h480", 
-        cwd="/home/jalaj/PX4-Autopilot", 
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=env
-    )
-
-    # Log the output from stdout and stderr in separate background tasks
-    asyncio.create_task(log_subprocess_output(sim_process.stdout, logger.info))
-    asyncio.create_task(log_subprocess_output(sim_process.stderr, logger.error))
-    logger.info("started sim connecting drone")
+    redis_listener_task = asyncio.create_task(telem_listener(sio))
 
 
-
-    mediamtx_process = await asyncio.create_subprocess_exec(
-        "./mediamtx", 
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    # mediamtx_process = await asyncio.create_subprocess_exec(
+    #     "./mediamtx", 
+    #     stdout=asyncio.subprocess.PIPE,
+    #     stderr=asyncio.subprocess.PIPE,
+    # )
 
     # # Log the output from stdout and stderr in separate background tasks
-    asyncio.create_task(log_subprocess_output(mediamtx_process.stdout, logger.info))
-    asyncio.create_task(log_subprocess_output(mediamtx_process.stderr, logger.error))
+    # asyncio.create_task(log_subprocess_output(mediamtx_process.stdout, logger.info))
+    # asyncio.create_task(log_subprocess_output(mediamtx_process.stderr, logger.error))
     
 
-    gst_process = await asyncio.create_subprocess_exec(
-        "gst-launch-1.0", "-v", "udpsrc", "port=5600", "caps=application/x-rtp,media=video,clock-rate=90000,encoding-name=H264", "!", "queue", "!", "rtph264depay", "!", "queue", "!", "avdec_h264", "!", "queue", "!", "videoconvert", "!" ,"queue" ,"!", "x264enc", "tune=zerolatency", "bitrate=2048", "speed-preset=ultrafast", "!", "queue", "!", "mpegtsmux", "!", "queue", "!", "udpsink", "host=0.0.0.0", "port=5700", "sync=false",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    # gst_process = await asyncio.create_subprocess_exec(
+    #     "gst-launch-1.0", "-v", "udpsrc", "port=5600", "caps=application/x-rtp,media=video,clock-rate=90000,encoding-name=H264", "!", "queue", "!", "rtph264depay", "!", "queue", "!", "avdec_h264", "!", "queue", "!", "videoconvert", "!" ,"queue" ,"!", "x264enc", "tune=zerolatency", "bitrate=2048", "speed-preset=ultrafast", "!", "queue", "!", "mpegtsmux", "!", "queue", "!", "udpsink", "host=0.0.0.0", "port=5700", "sync=false",
+    #     stdout=asyncio.subprocess.PIPE,
+    #     stderr=asyncio.subprocess.PIPE,
+    # )
 
     # # Log the output from stdout and stderr in separate background tasks
-    asyncio.create_task(log_subprocess_output(gst_process.stdout, logger.info))
-    asyncio.create_task(log_subprocess_output(gst_process.stderr, logger.error))
+    # asyncio.create_task(log_subprocess_output(gst_process.stdout, logger.info))
+    # asyncio.create_task(log_subprocess_output(gst_process.stderr, logger.error))
     
-    await drone.connect()
-    logger.success("connected to the drone")
-    logger.info("starting to stream telemetry")
-    await streamTelem(drone,sio)
+    # await drone.connect()
+    # logger.success("connected to the drone")
+    # logger.info("starting to stream telemetry")
+    # await streamTelem(drone,sio)
 
 
 @fastapi_app.on_event("shutdown")

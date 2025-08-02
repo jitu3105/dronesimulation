@@ -32,7 +32,7 @@ async def getPosition(drone:System,logger,redis:Redis,droneId:str):
             # logger.info(jsondata)
             jsondata=json.dumps(dta)
             # logger.info(jsondata)
-            redis.publish(f"telem:{droneId}",jsondata)
+            await redis.publish(f"telem:{droneId}",jsondata)
         except Exception as e:
             logger.error(e)
 
@@ -48,7 +48,7 @@ async def getStatusText(drone:System,logger,redis:Redis,droneId:str):
         dta["text"]=str(data.text)
         jsondata=json.dumps(dta)
         # logger.info(jsondata)
-        redis.publish(f"telem:{droneId}",jsondata)
+        await redis.publish(f"status:{droneId}",jsondata)
 
 
 async def getArmed(drone:System,logger,redis:Redis,droneId:str):
@@ -61,7 +61,7 @@ async def getArmed(drone:System,logger,redis:Redis,droneId:str):
         armed=data
         jsondata=json.dumps(dta)
         # logger.info(jsondata)
-        redis.publish(f"telem:{droneId}",jsondata)
+        await redis.publish(f"telem:{droneId}",jsondata)
 
 
 async def getFixedwingMetrics(drone:System,logger,redis:Redis,droneId:str):
@@ -70,7 +70,7 @@ async def getFixedwingMetrics(drone:System,logger,redis:Redis,droneId:str):
         dta["throttle"]=data.throttle_percentage
         jsondata=json.dumps(dta)
         # logger.info(jsondata)
-        redis.publish(f"telem:{droneId}",jsondata)
+        await redis.publish(f"telem:{droneId}",jsondata)
 
 
 
@@ -85,7 +85,7 @@ async def getAttitude(drone:System,logger,redis:Redis,droneId:str):
         # logger.info(jsondata)
         jsondata=json.dumps(dta)
         # logger.info(jsondata)
-        redis.publish(f"telem:{droneId}",jsondata)
+        await redis.publish(f"telem:{droneId}",jsondata)
 
 
 
@@ -98,7 +98,7 @@ async def getMode(drone:System,logger,redis:Redis,droneId:str):
         mode=str(data)
         jsondata=json.dumps(dta)
         # logger.info(jsondata)
-        redis.publish(f"telem:{droneId}",jsondata)
+        await redis.publish(f"telem:{droneId}",jsondata)
 
 
 async def getHeading(drone:System,logger,redis:Redis,droneId:str):
@@ -108,7 +108,7 @@ async def getHeading(drone:System,logger,redis:Redis,droneId:str):
         dta["heading"]=data.heading_deg
         jsondata=json.dumps(dta)
         # logger.info(jsondata)
-        redis.publish(f"telem:{droneId}",jsondata)
+        await redis.publish(f"telem:{droneId}",jsondata)
 
 
 async def streamTelem(drone:System,logger,redis:Redis,droneId:str):

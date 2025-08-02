@@ -17,9 +17,6 @@ const Telem: React.FC<{
   socket,
   // dispatch,
 }) => {
-  const mapRef = useRef<MapRef>(null);
-  const markerRef = useRef<any>(null);
-
   const leftJoySitckRef = useRef<Joystick>(null);
   const rightJoySitckRef = useRef<Joystick>(null);
   const controls = useRef<{
@@ -32,21 +29,10 @@ const Telem: React.FC<{
   useEffect(() => {
     const telemUpdater = (data: any) => {
       // console.log(mapRef);
-      if (data["heading"] && mapRef.current) {
-        mapRef.current.setBearing(data["heading"]);
-      }
-      if (data["lat"] && mapRef.current && markerRef.current) {
-        const newLngLat = {
-          lng: Number(data["lon"]),
-          lat: Number(data["lat"]),
-        };
-        // markerRef.current.setLnglat(newLngLat);
-        mapRef.current.setCenter(newLngLat);
-      }
+
       state.current = { ...state.current, ...data };
       // dispatch({ action: "update:telem", payload: data });
     };
-
     const statusUpdater = (data: any) => {
       switch (data.type) {
         case "INFO":
@@ -183,33 +169,7 @@ const Telem: React.FC<{
       <Card className="absolute p-2 bottom-1/2 right-2  bg-white/30 backdrop-blur-sm  rounded-sm border-none  flex flex-row gap-4">
         MSL:<p ref={mslRef}>{state.msl ? state.msl.toFixed(2) : "---"}</p>
       </Card>
-      <Card className="absolute w-full  sm:w-4/12 md:w-3/12 top-0 sm:top-4 right-0 sm:right-4 z-10  p-0  aspect-video overflow-hidden opacity-70 rounded-lg border-none ">
-        <Map
-          ref={mapRef}
-          style={{ width: "100%", height: "100%" }}
-          initialViewState={{
-            pitch: 45,
-            // latitude: 40.67,
-            // longitude: -103.59,
-            zoom: 17,
-          }}
-          // mapStyle="https://tiles.stadiamaps.com/styles/alidade_dark.json"
 
-          mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-          // interactiveLayerIds={[clusterLayer.id]}
-          // eslint-disable-next-line @typescript-eslint/no-misused-promises
-          // onClick={onClick}
-        >
-          <>
-            <Marker ref={markerRef} latitude={0.0} longitude={0.0}>
-              <Pin size={40} />
-            </Marker>
-          </>
-        </Map>
-        <Card className="absolute top-1/2 left-1/2 -translate-x-1/2 -rotate-45 bg-transparent shadow-none border-none">
-          <Send size={50} color="red" fill="red" />
-        </Card>
-      </Card>
       <Card className="absolute p-2 bottom-[20vmin] right-[4vmax]  bg-white/30 backdrop-blur-sm  rounded-full border-none opacity-50">
         <Joystick
           ref={rightJoySitckRef}

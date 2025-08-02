@@ -3,7 +3,7 @@ set -e
 
 # Start PX4 SITL in background
 cd /opt/px4/PX4-Autopilot
-make HEADLESS=1 px4_sitl_default gazebo-classic_typhoon_h480 &
+make HEADLESS=1 PX4_HOME_LAT=28.612928 PX4_HOME_LON=77.229831 px4_sitl_default gazebo-classic_typhoon_h480 &
 
 # Optional: sleep to let PX4 initialize
 sleep 5

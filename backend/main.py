@@ -78,18 +78,25 @@ r = redis.Redis(host="dronesim-redis", port=6379, db=0)
 
 
 async def telem_listener(sio):
+    r = redis.Redis(host="dronesim-redis", port=6379, db=0, decode_responses=True)
     pubsub = r.pubsub()
     await pubsub.psubscribe("telem:*")
+    await pubsub.psubscribe("status:*")
     logger.info("✅ Subscribed to telem:* channels")
 
     try:
         async for message in pubsub.listen():
             if message["type"] == "pmessage":
-                room=message["channel"].decode("utf-8")
-                data=message['data'].decode("utf-8")
+                room=message["channel"]
+                data=message['data']
                 # logger.info(f"📡 {room}: {data}")
                 data=json.loads(data)
-                await sio.emit("telem", data, room=room)
+                if "telem" in message["channel"]:
+                    await sio.emit("telem", data, room=room)
+                    await sio.emit("others", {room:data})
+                if "status" in message["channel"]:
+                    logger.info("got Status")
+                    await sio.emit("status", data, room=room)
     except asyncio.CancelledError:
         logger.warning("🛑 Redis listener cancelled")
     finally:
@@ -101,8 +108,9 @@ async def telem_listener(sio):
 async def connect(sid, environ):
     logger.info(f"Socket connected: {sid}")
     logger.info(f"creating a simulation for {sid}")
-    await sio.save_session(sid, {"room": f"telem:{sid}"})
+    await sio.save_session(sid, {"room": [f"telem:{sid}",f"status:{sid}"]})
     await sio.enter_room(sid, f"telem:{sid}")
+    await sio.enter_room(sid, f"status:{sid}")
     client = docker.from_env()
     droneId=sid
     container_name = f"drone-sim-{sid}"
@@ -135,47 +143,13 @@ async def disconnect(sid):
 
 @sio.event
 async def move(sid,data):
-    # now = time.time()
-    # client = client_tracking.get(sid)
-    # if not client:
-    #     return
-    # client['last_time'] = now
-    # if not client['tracking']:
-    #     client['tracking'] = True
-
-    #     async def monitor():
-    #         start_time = time.time()
-    #         while True:
-    #             await asyncio.sleep(0.1)
-    #             elapsed = time.time() - start_time
-    #             gap = time.time() - client['last_time']
-                 
-    #             if gap > 0.5:
-    #                 # Too much delay between moves, reset
-    #                 client['tracking'] = False
-    #                 break
-                
-    #             if elapsed >= 3:
-    #                 logger.info("hehe")
-    #                 client['tracking'] = False
-    #                 break
-    #     client['task'] = asyncio.create_task(monitor())
-    armed=fetchArmed()
-    if not armed:
-        print(data["dwn"] ,data["yaw"])
-        if data["dwn"] < -1.5 :
-            await drone.action.arm()
-        # if data["dwn"] > 1.5 and data["yaw"] < -15:
-        #     await drone.action.disarm()
-        
-    mode=fetchMode()
-    if mode != "OFFBOARD":
-        velocities=VelocityBodyYawspeed(0,0,0, 0)
-        await drone.offboard.set_velocity_body(velocities)
-        await drone.offboard.start()
-    velocities=VelocityBodyYawspeed(data["fwd"],data["rgt"],data["dwn"], data["yaw"])
-    await drone.offboard.set_velocity_body(velocities)
-    logger.info("sending velocities commands")
+    global r 
+    jsondata=json.dumps(data)
+    channel=f"controls:{sid}"
+    logger.info("channel = "+channel)
+    await r.publish(channel,jsondata)
+    logger.info("sending velocities commands = "+jsondata)
+    
 
 
 @sio.event

@@ -1,26 +1,12 @@
-import { useEffect, useReducer, useRef, useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { Card } from "./components/ui/card";
-import WebRTCPlayer from "./WebRTCPlayer";
 import Telem from "./Telem";
 import { Toaster } from "@/components/ui/sonner";
 import ThreeDWorld from "./ThreeDWorld";
 const SOCKET_URL = `http://${location.hostname}:8000`; // Adjust if your server runs on a different port
 import io, { Socket } from "socket.io-client";
-
-const reducer = (
-  state: any,
-  { action, payload }: { action: string; payload: any }
-) => {
-  switch (action) {
-    case "update:telem":
-      state = { ...state, ...payload };
-    default:
-      return state;
-  }
-};
+import GameMap from "./GameMap";
 
 function App() {
   const [socket, setSocket] = useState<Socket>();
@@ -48,6 +34,7 @@ function App() {
           <>
             {/*<WebRTCPlayer stream={socket.id} />*/}
             <ThreeDWorld state={state} />
+            <GameMap state={state} />
             {/* <ThreeDWorld /> */}
             {/* <Telem state={state} dispatch={dispatch} /> */}
             <Telem state={state} socket={socket} />

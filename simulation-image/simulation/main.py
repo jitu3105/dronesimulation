@@ -10,7 +10,9 @@ import subprocess
 import os
 import uuid
 import socket
-import redis
+import json
+import redis.asyncio as redis
+
 
 last_command_time=None
 
@@ -19,13 +21,17 @@ last_command_time=None
 px4_sim_process = None
 
 
+commandListenerAsync=None
+streamTelemAsync=None
+
+
 # Allowed origins
 origins = ["http://localhost:5173","http://192.168.1.11:5173","http://192.168.1.91:5173"]
 
 # Create FastAPI app
 app = FastAPI()
 
-
+drone:System =None
 
 async def log_subprocess_output(stream, logger_func):
     while True:
@@ -68,27 +74,58 @@ async def read_stream_and_log(stream, log_func, prefix="SIM"):
             log_func(f"[{prefix}] Error reading stream: {e}")
             break
 
+async def command_listener():
+    logger.info("fetching droneId")
+    droneId = os.environ.get("DRONE_ID", uuid.uuid4().hex[:8])
+    logger.info("droneId = "+droneId)
+    r = redis.Redis(host="dronesim-redis", port=6379, db=0, decode_responses=True)
+    pubsub = r.pubsub()
+    controlsChannel=f"controls:{droneId}"
+    commandsChannel=f"commands:{droneId}"
+    await pubsub.subscribe(commandsChannel)
+    await pubsub.subscribe(controlsChannel)
+    logger.info("✅ Subscribed to "+commandsChannel)
+    logger.info("✅ Subscribed to "+controlsChannel)
 
-# async def command_listener(sio):
-#     r = redis.Redis(host="dronesim-redis", port=6379, db=0)
-#     pubsub = r.pubsub()
-#     await pubsub.psubscribe("command:*")
-#     logger.info("✅ Subscribed to telem:* channels")
+    try:
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                if message["channel"]==controlsChannel:
+                    data=message['data']
+                    logger.info("controls")
+                    try:
+                        data = json.loads(message['data'])
+                        armed=fetchArmed()
+                        if not armed:
+                            print(data["dwn"] ,data["yaw"])
+                            if data["dwn"] < -1.5 :
+                                await drone.action.arm()
+                            # if data["dwn"] > 1.5 and data["yaw"] < -15:
+                            #     await drone.action.disarm()
+                            
+                        mode=fetchMode()
+                        if mode != "OFFBOARD":
+                            velocities=VelocityBodyYawspeed(0,0,0, 0)
+                            await drone.offboard.set_velocity_body(velocities)
+                            await drone.offboard.start()
+                        velocities=VelocityBodyYawspeed(data["fwd"],data["rgt"],data["dwn"],data["yaw"])
+                        await drone.offboard.set_velocity_body(velocities)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Malformed JSON in {message['channel']}: {message['data']}")
+                        continue
+                    logger.info(data)
+                if message["channel"]==commandsChannel:
+                    data=message['data'].decode("utf-8")
+                    # logger.info(f"📡 {room}: {data}")
+                    logger.info("command")
+                    data=json.loads(data)
+                    logger.info(data)
 
-#     try:
-#         async for message in pubsub.listen():
-#             if message["type"] == "pmessage":
-#                 room=message["channel"].decode("utf-8")
-#                 data=message['data'].decode("utf-8")
-#                 # logger.info(f"📡 {room}: {data}")
-#                 data=json.loads(data)
-#                 await sio.emit("telem", data, room=room)
-
-#     except asyncio.CancelledError:
-#         logger.warning("🛑 Redis listener cancelled")
-#     finally:
-#         logger.error("===============FINALLY OF TELEM LISTENER===============")
-#         await pubsub.close()
+    except asyncio.CancelledError:
+        logger.warning("🛑 Redis listener cancelled")
+    finally:
+        logger.error("===============FINALLY OF TELEM LISTENER===============")
+        # await pubsub.close()
 
 
 
@@ -109,15 +146,17 @@ def send_px4_command(proc: subprocess.Popen, command: str):
         print("[ERROR] Cannot write to PX4 stdin.",flush=True)
 
 async def wait_for_sim_connection( retries: int = 60, delay: float = 10.0):
+    global drone
     for attempt in range(retries):
         try:
             logger.info(f"trying to connect {attempt}")
-            drone = System()
-            await drone.connect()
-            async for state in drone.core.connection_state():
+            drn = System()
+            await drn.connect()
+            async for state in drn.core.connection_state():
                 if state.is_connected:
-                    logger.success(f"Connected to drone on udp://localhost:14580")
-                    return drone
+                    logger.success(f"Connected to drone")
+                    drone=drn
+                    return drn
                 else:
                     await asyncio.sleep(1)
         except Exception as e:
@@ -131,6 +170,8 @@ async def wait_for_sim_connection( retries: int = 60, delay: float = 10.0):
 # You can optionally connect the drone and start telemetry here
 @app.on_event("startup")
 async def on_startup():
+    global commandListenerAsync
+    global streamTelemAsync
     try:
         r = redis.Redis(host="dronesim-redis", port=6379, db=0)
         r.ping()
@@ -144,9 +185,12 @@ async def on_startup():
         try:
             drone = await wait_for_sim_connection()
             logger.info("========drone connected=======")
-            await streamTelem(drone=drone,logger=logger,redis=r,droneId=droneId)
+            commandListenerAsync= asyncio.create_task(command_listener())
+            streamTelemAsync= asyncio.create_task(streamTelem(drone=drone,logger=logger,redis=r,droneId=droneId))
         except TimeoutError as e:
             logger.error(e)
+        logger.success("✅  Startup completed...")
+
 
 
     except Exception as e:

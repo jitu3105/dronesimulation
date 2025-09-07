@@ -26,7 +26,7 @@ redis_listener_task = None
 
 
 # Allowed origins
-origins = ["http://localhost:5173","http://192.168.1.11:5173","http://192.168.1.91:5173","http://jalajghuge.co.in:5173"]
+origins = ["http://localhost:5173","http://192.168.1.11:5173","http://192.168.1.91:5173","https://dronesim.jalajghuge.co.in"]
 
 # Create the drone instance
 drone:System = System(port=5052)
@@ -55,6 +55,8 @@ fastapi_app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
 # FastAPI route
 @fastapi_app.get("/arm")
 async def arm():
@@ -65,7 +67,8 @@ async def arm():
 # Create Socket.IO server
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins=origins
+    cors_allowed_origins=origins,
+    path="/ws/dronesim"
 )
 
 
@@ -133,11 +136,13 @@ async def connect(sid, environ):
 
 @sio.event
 async def disconnect(sid):
-    print(f'Client disconnected: {sid}')
     client = docker.from_env()
-    container = client.containers.get(f"drone-sim-{sid}")  # use container name or ID
-    container.kill()  # force stop immediately
-    print("Container forcefully stopped.")
+    try:
+        container = client.containers.get(f"drone-sim-{sid}")
+        container.kill()
+        logger.info(f'Client disconnected: {sid}')
+    except docker.errors.NotFound:
+        logger.warning(f"Container drone-sim-{sid} not found on disconnect")
     logger.info(f"Socket disconnected: {sid}")
 
 
@@ -161,8 +166,11 @@ async def message(sid, data):
 app = socketio.ASGIApp(
     socketio_server=sio,
     other_asgi_app=fastapi_app,
-    socketio_path="/ws/socket.io"  # important
+    socketio_path="/ws/dronesim"  # important
 )
+
+
+
 
 # You can optionally connect the drone and start telemetry here
 @fastapi_app.on_event("startup")

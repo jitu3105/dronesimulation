@@ -4,7 +4,7 @@ import { Card } from "./components/ui/card";
 import Telem from "./Telem";
 import { Toaster } from "@/components/ui/sonner";
 import ThreeDWorld from "./ThreeDWorld";
-const SOCKET_URL = `http://${location.hostname}:8000`; // Adjust if your server runs on a different port
+const SOCKET_URL = `https://${location.hostname}`; // Adjust if your server runs on a different port
 import io, { Socket } from "socket.io-client";
 import GameMap from "./GameMap";
 
@@ -13,7 +13,7 @@ function App() {
   useEffect(() => {
     // const a = new Set();
     const skt = io(SOCKET_URL, {
-      path: "/ws/socket.io", // 👈 Must match FastAPI mount path + socket.io suffix
+      path: "/ws/dronesim", // 👈 Must match FastAPI mount path + socket.io suffix
       transports: ["websocket"], // Optional, avoid long-polling
     });
     skt.on("connect", () => {

@@ -138,66 +138,175 @@ const Telem: React.FC<{
   const aglRef = useRef<HTMLParagraphElement>(null);
   const mslRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
+    const aglBar = document.getElementById("aglBar");
+    const mslBar = document.getElementById("mslBar");
+
     const animate = () => {
-      if (state.current.agl && aglRef.current && mslRef.current) {
-        aglRef.current.innerHTML =
-          state.current.agl < 0 ? 0 : state.current.agl.toFixed(0);
-        mslRef.current.innerHTML =
-          state.current.msl < 0 ? 0 : state.current.msl.toFixed(0);
+      const agl = state.current?.agl ?? 0;
+      const msl = state.current?.msl ?? 0;
+
+      if (aglRef.current) {
+        aglRef.current.innerHTML = agl < 0 ? "0" : agl.toFixed(0);
       }
-      if (modeRef.current && state.current.mode) {
+
+      if (mslRef.current) {
+        mslRef.current.innerHTML = msl < 0 ? "0" : msl.toFixed(0);
+      }
+
+      if (modeRef.current && state.current?.mode) {
         modeRef.current.innerHTML = state.current.mode;
       }
+
+      // update bar heights
+      if (aglBar) {
+        aglBar.style.height = `${Math.min(agl * 2, 100)}%`;
+      }
+
+      if (mslBar) {
+        mslBar.style.height = `${Math.min(msl / 5, 100)}%`;
+      }
+
       animationId = requestAnimationFrame(animate);
     };
+
     let animationId = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(animationId);
   }, []);
   return (
     <>
-      {state.armed}
+      {/* Cinematic dark overlay */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/40 via-transparent to-black/70" />
+
+      {/* ARMED ALERT */}
+      {state.current?.armed && (
+        <div className="absolute top-6 right-6 text-red-500 text-lg font-bold tracking-widest animate-pulse">
+          ● ARMED
+        </div>
+      )}
+
+      {/* MODE BAR (center bottom) */}
       <Card
-        className={`absolute p-2 bottom-[12vmax] left-1/2 -translate-x-1/2 ${
-          state.armed ? "bg-red-500/30" : "bg-white/30"
-        }  backdrop-blur-sm rounded-sm border-none  flex flex-row gap-4`}
+        className="
+    absolute
+    bottom-8   /* sits above radar */
+    left-1/2
+    -translate-x-1/2
+    px-8 py-3
+    backdrop-blur-md
+    bg-black/70
+    text-white
+    border border-white/10
+    shadow-xl
+    rounded-md
+    tracking-widest
+    text-sm
+    font-semibold
+    z-30
+  "
       >
-        MODE: <p ref={modeRef}>{state.mode}</p>
-      </Card>
-      <Card className="absolute p-2 bottom-1/2 left-2  bg-white/30 backdrop-blur-sm  rounded-sm border-none flex flex-row gap-4">
-        <p>AGL:</p>
-        <p ref={aglRef}>{state.agl ? state.agl.toFixed(2) : "---"}</p>
-      </Card>
-      <Card className="absolute p-2 bottom-1/2 right-2  bg-white/30 backdrop-blur-sm  rounded-sm border-none  flex flex-row gap-4">
-        MSL:<p ref={mslRef}>{state.msl ? state.msl.toFixed(2) : "---"}</p>
+        <span className="opacity-60">MODE</span>
+        <span
+          ref={modeRef}
+          className={`ml-4 ${
+            state.current?.armed ? "text-red-400" : "text-cyan-400"
+          }`}
+        >
+          ---
+        </span>
       </Card>
 
-      <Card className="absolute p-2 bottom-[20vmin] right-[4vmax]  bg-white/30 backdrop-blur-sm  rounded-full border-none opacity-50">
+      {/* LEFT SIDE ALTITUDE HUD */}
+      <div className="absolute left-6 bottom-1/2 -translate-y-1/2 flex flex-col items-center gap-6">
+        {/* AGL BAR */}
+        <div className="relative w-6 h-52 bg-black/60 border border-white/10 rounded overflow-hidden shadow-lg">
+          <div
+            id="aglBar"
+            className="absolute bottom-0 w-full bg-green-400 transition-all duration-150"
+            style={{ height: "0%" }}
+          />
+        </div>
+        {/* AGL BAR */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative w-10 h-56 bg-black/60 border border-white/10 rounded-lg overflow-hidden shadow-xl">
+            {/* Scale lines */}
+            <div className="absolute inset-0 flex flex-col justify-between py-2 pointer-events-none">
+              {[0, 25, 50, 75, 100].map((v) => (
+                <div key={v} className="w-full border-t border-white/10" />
+              ))}
+            </div>
+
+            {/* Fill */}
+            <div
+              className="absolute bottom-0 w-full transition-all duration-200 ease-out
+                 bg-gradient-to-t from-green-500 via-green-400 to-emerald-300
+                 shadow-[0_0_15px_rgba(34,197,94,0.6)]"
+              style={{
+                height: `${Math.min((state.current?.agl ?? 0) * 2, 100)}%`,
+              }}
+            />
+          </div>
+
+          {/* Value Label */}
+          <div className="text-xs text-white tracking-widest text-center">
+            <div className="opacity-50">AGL</div>
+            <div className="text-sm font-semibold">
+              {(state.current?.agl ?? 0) < 0
+                ? 0
+                : Number(state.current?.agl ?? 0).toFixed(0)}
+            </div>
+          </div>
+        </div>
+
+        {/* MSL BAR */}
+        <div className="relative w-6 h-52 bg-black/60 border border-white/10 rounded overflow-hidden shadow-lg">
+          <div
+            id="mslBar"
+            className="absolute bottom-0 w-full bg-blue-400 transition-all duration-150"
+            style={{ height: "0%" }}
+          />
+        </div>
+        <div className="text-xs text-white opacity-70 tracking-widest">
+          MSL <span ref={mslRef}>0</span>
+        </div>
+      </div>
+
+      {/* RIGHT JOYSTICK */}
+      <Card
+        className="absolute p-5 bottom-[18vmin] right-[4vmax]
+      bg-black/60 backdrop-blur-md rounded-full
+      border border-white/10 shadow-2xl"
+      >
         <Joystick
           ref={rightJoySitckRef}
-          size={125}
-          sticky={true}
-          baseColor="transparent"
-          stickColor="white"
+          size={150}
+          sticky
+          baseColor="rgba(255,255,255,0.05)"
+          stickColor="#00ffcc"
           throttle={200}
-          // baseShape={JoystickShape.Circle}
           controlPlaneShape={JoystickShape.Square}
           move={handleRightMove}
           stop={handleRightStop}
-          // move={handleMove}
-          // stop={handleStop}
-        ></Joystick>
+        />
       </Card>
-      <Card className="absolute p-2 bottom-[20vmin] left-[4vmax]  bg-white/30 backdrop-blur-sm  rounded-full border-none opacity-50">
+
+      {/* LEFT JOYSTICK */}
+      <Card
+        className="absolute p-5 bottom-[18vmin] left-[4vmax]
+      bg-black/60 backdrop-blur-md rounded-full
+      border border-white/10 shadow-2xl"
+      >
         <Joystick
           ref={leftJoySitckRef}
-          size={125}
-          sticky={true}
-          baseColor="transparent"
-          stickColor="white"
+          size={150}
+          sticky
+          baseColor="rgba(255,255,255,0.05)"
+          stickColor="#ff0066"
           throttle={200}
           controlPlaneShape={JoystickShape.Square}
           move={handleLeftMove}
           stop={handleLeftStop}
-        ></Joystick>
+        />
       </Card>
     </>
   );

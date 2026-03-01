@@ -9,141 +9,206 @@ import {
   TextureLoader,
   RepeatWrapping,
 } from "three";
-
+useGLTF.preload("/drone.glb");
 const ThreeDWorld: React.FC<{ state: any }> = ({ state }) => {
   const texture = useLoader(TextureLoader, "/ground.png");
   texture.wrapS = texture.wrapT = RepeatWrapping;
   texture.repeat.set(25, 25);
 
   return (
-    <Canvas style={{ background: "#87CEEB" }} shadows>
+    <Canvas
+      style={{ background: "#87CEEB" }}
+      shadows
+      gl={{ antialias: true }}
+      dpr={[1, 2]}
+      camera={{ fov: 60 }}
+    >
       <Sky
-        distance={450000}
+        distance={1000}
         sunPosition={[100, 20, 100]}
         inclination={0}
         azimuth={0.25}
       />
+
       <Suspense fallback={null}>
-        <DroneModel props={{ position: [0, 0, 0] }} state={state} />
+        <DroneModel state={state} />
       </Suspense>
+
       <ambientLight intensity={0.4} />
-      <directionalLight position={[100, 100, 100]} intensity={1} castShadow />
+      <directionalLight
+        position={[100, 100, 100]}
+        intensity={1}
+        castShadow
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+      />
+
       <Ground />
-      <OrbitControls />
     </Canvas>
   );
 };
 
 const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
+// Convert Lat/Lon to meters (North/East)
 const latLonToMeters = (
   lat: number,
   lon: number,
   originLat: number,
-  originLon: number
+  originLon: number,
 ) => {
   const R = 6378137;
+
   const dLat = ((lat - originLat) * Math.PI) / 180;
   const dLon = ((lon - originLon) * Math.PI) / 180;
   const meanLat = (((lat + originLat) / 2) * Math.PI) / 180;
 
-  const x = R * dLon * Math.cos(meanLat); // East
-  const z = R * dLat; // North
+  const east = R * dLon * Math.cos(meanLat);
+  const north = R * dLat;
 
-  return { x, z };
+  return { east: -east, north: -north };
 };
-
-const DroneModel: React.FC<{ props: any; state: any }> = ({ props, state }) => {
-  const temp: any = useGLTF("/drone.glb");
-  const gltf: Group = temp.scene;
+const DroneModel: React.FC<{ state: any }> = ({ state }) => {
+  const { scene } = useGLTF("/drone.glb");
   const sceneRef = useRef<Group>(null);
-
-  const prop1 = useRef<Object3D>(null);
-  const prop2 = useRef<Object3D>(null);
-  const prop3 = useRef<Object3D>(null);
-  const prop4 = useRef<Object3D>(null);
-
   const { camera } = useThree();
+
   const [origin, setOrigin] = useState<{ lat: number; lon: number } | null>(
-    null
+    null,
   );
 
-  // Smooth state
   const currentPosition = useRef(new Vector3());
+  const targetPosition = useRef(new Vector3());
+
   const currentRotation = useRef(new Euler());
+  const targetRotation = useRef(new Euler());
+
   const smoothThrottle = useRef(0);
 
-  useEffect(() => {
-    if (sceneRef.current) {
-      prop1.current = sceneRef.current.getObjectByName("prop_fl") || null;
-      prop2.current = sceneRef.current.getObjectByName("prop_fr") || null;
-      prop3.current = sceneRef.current.getObjectByName("prop_rl") || null;
-      prop4.current = sceneRef.current.getObjectByName("prop_rr") || null;
-    }
-  }, [temp]);
+  const cameraTarget = useRef(new Vector3());
+  const droneWorldPos = useRef(new Vector3());
 
+  const propRefs = useRef<Object3D[]>([]);
+
+  // Get propellers once
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!origin && state.current.lat && state.current.lon) {
-        setOrigin({ lat: state.current.lat, lon: state.current.lon });
-        clearInterval(interval);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [origin]);
+    if (!scene) return;
+
+    propRefs.current = [
+      scene.getObjectByName("prop_fl"),
+      scene.getObjectByName("prop_fr"),
+      scene.getObjectByName("prop_rl"),
+      scene.getObjectByName("prop_rr"),
+    ].filter(Boolean) as Object3D[];
+  }, [scene]);
 
   useFrame((_, delta) => {
-    if (!sceneRef.current || !origin) return;
+    if (!state.current) return;
 
-    // Smooth throttle
-    const rawThrottle = state.current?.throttle || 0;
-    smoothThrottle.current += (rawThrottle - smoothThrottle.current) * 0.1;
-    const spinSpeed = smoothThrottle.current * 100;
-
-    // Spin propellers
-    for (const prop of [prop1, prop2, prop3, prop4]) {
-      if (prop.current) {
-        prop.current.rotation.y += delta * spinSpeed;
-      }
+    // Initialize origin once
+    if (!origin && state.current.lat && state.current.lon) {
+      setOrigin({
+        lat: state.current.lat,
+        lon: state.current.lon,
+      });
+      return;
     }
 
-    // Calculate drone position
-    const { x, z } = latLonToMeters(
+    if (!sceneRef.current || !origin) return;
+
+    // ======================
+    // PROPELLER SPIN
+    // ======================
+
+    const rawThrottle = state.current.throttle || 0;
+    smoothThrottle.current += (rawThrottle - smoothThrottle.current) * 0.1;
+
+    const spinSpeed = smoothThrottle.current * 120;
+
+    propRefs.current.forEach((prop, index) => {
+      // Alternate spin direction (realistic quad physics)
+      const direction = index % 2 === 0 ? 1 : -1;
+      prop.rotation.y += delta * spinSpeed * direction;
+    });
+
+    // ======================
+    // POSITION (NED → THREE)
+    // ======================
+
+    const { east, north } = latLonToMeters(
       state.current.lat,
       state.current.lon,
       origin.lat,
-      origin.lon
+      origin.lon,
     );
 
-    const y = state.current.armed ? (state.current.agl || 0) / 2 : 0;
-    const newPosition = new Vector3(x, y, -z);
+    // MAVLink: NED (North East Down)
+    // Three.js: X right, Y up, Z toward camera
+    // So:
+    // X = East
+    // Y = Up (invert down)
+    // Z = -North
 
-    // Smooth position
-    currentPosition.current.lerp(newPosition, 0.1);
+    const altitude = state.current.agl || 0;
+    const up = state.current.armed ? altitude / 2 : 0;
+
+    targetPosition.current.set(east, up, -north);
+
+    currentPosition.current.lerp(targetPosition.current, 0.1);
     sceneRef.current.position.copy(currentPosition.current);
 
-    // Rotation smoothing
-    const roll = -degToRad(state.current.roll_deg ?? 0) / 4;
+    // ======================
+    // ROTATION
+    // ======================
+
+    const roll = degToRad(state.current.roll_deg ?? 0) / 4;
     const pitch = degToRad(state.current.pitch_deg ?? 0) / 4;
     const yaw = -degToRad(state.current.yaw_deg ?? 0);
 
-    const newRotation = new Euler(pitch, yaw, roll, "YXZ");
+    targetRotation.current.set(pitch, yaw, roll, "YXZ");
+
     currentRotation.current.x +=
-      (newRotation.x - currentRotation.current.x) * 0.1;
+      (targetRotation.current.x - currentRotation.current.x) * 0.1;
     currentRotation.current.y +=
-      (newRotation.y - currentRotation.current.y) * 0.1;
+      (targetRotation.current.y - currentRotation.current.y) * 0.1;
     currentRotation.current.z +=
-      (newRotation.z - currentRotation.current.z) * 0.1;
+      (targetRotation.current.z - currentRotation.current.z) * 0.1;
 
     sceneRef.current.rotation.copy(currentRotation.current);
 
-    // Camera follows smoothly
-    const cameraTarget = sceneRef.current.localToWorld(new Vector3(0, 2, 5));
-    camera.position.lerp(cameraTarget, 0.1);
-    camera.lookAt(sceneRef.current.position);
+    // ======================
+    // STABLE CHASE CAMERA
+    // ======================
+
+    droneWorldPos.current.copy(sceneRef.current.position);
+
+    const distance = 10;
+    const height = 4;
+
+    const yawOnly = currentRotation.current.y;
+
+    const offsetX = Math.sin(yawOnly) * distance;
+    const offsetZ = Math.cos(yawOnly) * distance;
+
+    cameraTarget.current.set(
+      droneWorldPos.current.x - offsetX,
+      droneWorldPos.current.y + height,
+      droneWorldPos.current.z - offsetZ,
+    );
+
+    camera.position.lerp(cameraTarget.current, 0.08);
+
+    const lookTarget = droneWorldPos.current.clone();
+    lookTarget.y += 1.5;
+
+    camera.lookAt(lookTarget);
   });
 
-  return <primitive object={gltf} {...props} ref={sceneRef} />;
+  return (
+    <group ref={sceneRef}>
+      <primitive object={scene} rotation={[0, Math.PI, 0]} />
+    </group>
+  );
 };
 
 const MemoisedThreeDWorld = memo(ThreeDWorld);
@@ -151,12 +216,13 @@ export default MemoisedThreeDWorld;
 
 const Ground = () => {
   const texture = useTexture("/ground.png");
+
   texture.wrapS = texture.wrapT = RepeatWrapping;
-  texture.repeat.set(25, 25);
+  texture.repeat.set(100, 100);
 
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <planeGeometry args={[200, 200]} />
+      <planeGeometry args={[2000, 2000]} />
       <meshStandardMaterial map={texture} />
     </mesh>
   );

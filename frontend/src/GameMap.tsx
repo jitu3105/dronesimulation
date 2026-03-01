@@ -1,60 +1,108 @@
 import React, { useEffect, useRef, useState } from "react";
-
 import { Map, Marker, type MapRef } from "react-map-gl/maplibre";
 import { Card } from "./components/ui/card";
-import { Send } from "lucide-react";
+
 const GameMap: React.FC<{ state: any }> = ({ state }) => {
   const mapRef = useRef<MapRef>(null);
-  const [lngLat, setLngLat] = useState({ lat: 0, lng: 0 });
+
+  const [position, setPosition] = useState({
+    lat: 0,
+    lng: 0,
+  });
+
   useEffect(() => {
-    const mapUpdater = async () => {
-      if (state.current["heading"] && state.current["lat"] && mapRef.current) {
+    let animationId: number;
+
+    const mapUpdater = () => {
+      const current = state.current;
+
+      if (
+        current?.lat !== undefined &&
+        current?.lon !== undefined &&
+        mapRef.current
+      ) {
         const newLngLat = {
-          lng: Number(state.current["lon"]),
-          lat: Number(state.current["lat"]),
+          lng: Number(current.lon),
+          lat: Number(current.lat),
         };
-        const bearing = mapRef.current.getBearing();
-        setLngLat(newLngLat);
-        if (!isNaN(bearing)) {
-          mapRef.current.setBearing(state.current["heading"]);
-          mapRef.current.setZoom(17 - (state.current["agl"] / 2000) * 17);
-          mapRef.current.setCenter(newLngLat);
+
+        if (!isNaN(newLngLat.lat) && !isNaN(newLngLat.lng)) {
+          setPosition(newLngLat);
+
+          const map = mapRef.current;
+
+          // Center map on drone
+          map.setCenter(newLngLat);
+
+          // Rotate map instead of marker (GTA style)
+          if (!isNaN(current.heading)) {
+            map.setBearing(current.heading);
+          }
+
+          // Smooth zoom based on AGL
+          const agl = Number(current.agl) || 0;
+          const zoom = Math.max(12, Math.min(18, 18 - agl / 150));
+          map.setZoom(zoom);
         }
       }
-      await new Promise((resolve) => setTimeout(resolve, 100));
+
       animationId = requestAnimationFrame(mapUpdater);
     };
-    let animationId = requestAnimationFrame(mapUpdater);
-    return () => {
-      cancelAnimationFrame(animationId);
-    };
+
+    animationId = requestAnimationFrame(mapUpdater);
+
+    return () => cancelAnimationFrame(animationId);
   }, [state]);
 
   return (
-    <Card className="absolute w-full  sm:w-4/12 md:w-3/12 top-0 sm:top-4 right-0 sm:right-4 z-10  p-0  aspect-video overflow-hidden opacity-70 rounded-lg border-none pointer-events-none">
+    <Card
+      className="
+        absolute
+        bottom-16
+        left-1/2
+        -translate-x-1/2
+        w-[140px] h-[140px]
+        sm:w-[180px] sm:h-[180px]
+        md:w-[220px] md:h-[220px]
+        bg-black/70
+        backdrop-blur-md
+        rounded-full
+        border-4 border-white/20
+        shadow-2xl
+        overflow-hidden
+        z-20
+        pointer-events-none
+      "
+    >
       <Map
         ref={mapRef}
         style={{ width: "100%", height: "100%" }}
         initialViewState={{
-          pitch: 90,
-          // latitude: 40.67,
-          // longitude: -103.59,
-          zoom: 12,
+          latitude: 0,
+          longitude: 0,
+          zoom: 14,
+          pitch: 0,
+          bearing: 0,
         }}
-        // mapStyle="https://tiles.stadiamaps.com/styles/alidade_dark.json"
-
         mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-        // interactiveLayerIds={[clusterLayer.id]}
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        // onClick={onClick}
-      >
-        <Marker latitude={lngLat.lat} longitude={lngLat.lng}>
-          <Card className="bg-red-500 text-white p-1">📍</Card>
-        </Marker>
-      </Map>
-      <Card className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-transparent shadow-none border-none">
-        <Send size={30} color="red" fill="red" />
-      </Card>
+        attributionControl={false}
+        interactive={false}
+      />
+
+      {/* inner ring */}
+      <div className="absolute inset-0 rounded-full border border-white/10" />
+
+      {/* center arrow */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="
+            w-0 h-0
+            border-l-[8px] border-l-transparent
+            border-r-[8px] border-r-transparent
+            border-b-[16px] border-b-red-500
+          "
+        />
+      </div>
     </Card>
   );
 };

@@ -9,6 +9,7 @@ import io, { Socket } from "socket.io-client";
 import GameMap from "./GameMap";
 
 function App() {
+  const [isReady, setIsReady] = useState(false);
   const [socket, setSocket] = useState<Socket>();
   useEffect(() => {
     // const a = new Set();
@@ -16,6 +17,10 @@ function App() {
       path: "/ws/dronesim", // 👈 Must match FastAPI mount path + socket.io suffix
       transports: ["websocket"], // Optional, avoid long-polling
     });
+    skt.once("telem", () => {
+      setIsReady(true);
+    });
+
     skt.on("connect", () => {
       setSocket(skt);
     });
@@ -29,7 +34,18 @@ function App() {
         theme="light"
         className="opacity-80 pointer-events-none"
       />
+
       <Card className="relative w-screen h-screen p-0 rounded-none border-none">
+        {!isReady && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black">
+            <div className="text-center space-y-6">
+              <div className="h-16 w-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+              <p className="text-white text-lg tracking-wide">
+                Spawning Simulation...
+              </p>
+            </div>
+          </div>
+        )}
         {socket && socket.id && (
           <>
             {/*<WebRTCPlayer stream={socket.id} />*/}

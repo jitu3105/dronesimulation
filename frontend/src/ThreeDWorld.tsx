@@ -8,6 +8,7 @@ import {
   Euler,
   TextureLoader,
   RepeatWrapping,
+  Quaternion,
 } from "three";
 useGLTF.preload("/drone.glb");
 const ThreeDWorld: React.FC<{ state: any }> = ({ state }) => {
@@ -161,46 +162,48 @@ const DroneModel: React.FC<{ state: any }> = ({ state }) => {
     // ROTATION
     // ======================
 
-    const roll = degToRad(state.current.roll_deg ?? 0) / 4;
-    const pitch = degToRad(state.current.pitch_deg ?? 0) / 4;
+    const roll = degToRad(state.current.roll_deg ?? 0);
+    const pitch = -degToRad(state.current.pitch_deg ?? 0);
     const yaw = -degToRad(state.current.yaw_deg ?? 0);
 
     targetRotation.current.set(pitch, yaw, roll, "YXZ");
 
-    currentRotation.current.x +=
-      (targetRotation.current.x - currentRotation.current.x) * 0.1;
-    currentRotation.current.y +=
-      (targetRotation.current.y - currentRotation.current.y) * 0.1;
-    currentRotation.current.z +=
-      (targetRotation.current.z - currentRotation.current.z) * 0.1;
+    // currentRotation.current.x +=
+    //   (targetRotation.current.x - currentRotation.current.x) * 0.1;
+    // currentRotation.current.y +=
+    //   (targetRotation.current.y - currentRotation.current.y) * 0.1;
+    // currentRotation.current.z +=
+    //   (targetRotation.current.z - currentRotation.current.z) * 0.1;
 
-    sceneRef.current.rotation.copy(currentRotation.current);
+    // sceneRef.current.rotation.copy(currentRotation.current);
+    const targetQuat = new Quaternion().setFromEuler(targetRotation.current);
+    sceneRef.current.quaternion.slerp(targetQuat, 0.1);
 
-    // ======================
-    // STABLE CHASE CAMERA
-    // ======================
+    // GTA CHASE CAMERA
+    sceneRef.current.getWorldPosition(droneWorldPos.current);
 
-    droneWorldPos.current.copy(sceneRef.current.position);
+    const distance = 12;
+    const height = 5;
 
-    const distance = 10;
-    const height = 4;
+    // Yaw-only facing direction
+    const facingDir = new Vector3(0, 0, 1).applyQuaternion(
+      sceneRef.current.quaternion,
+    );
+    facingDir.y = 0;
+    facingDir.normalize();
 
-    const yawOnly = currentRotation.current.y;
-
-    const offsetX = Math.sin(yawOnly) * distance;
-    const offsetZ = Math.cos(yawOnly) * distance;
-
-    cameraTarget.current.set(
-      droneWorldPos.current.x - offsetX,
+    // Ideal position: behind and above
+    const idealPos = new Vector3(
+      droneWorldPos.current.x - facingDir.x * distance,
       droneWorldPos.current.y + height,
-      droneWorldPos.current.z - offsetZ,
+      droneWorldPos.current.z - facingDir.z * distance,
     );
 
-    camera.position.lerp(cameraTarget.current, 0.08);
+    camera.position.lerp(idealPos, 0.1);
 
+    // Always look at the drone
     const lookTarget = droneWorldPos.current.clone();
     lookTarget.y += 1.5;
-
     camera.lookAt(lookTarget);
   });
 

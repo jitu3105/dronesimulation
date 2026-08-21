@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { Card } from "./components/ui/card";
-import Telem from "./Telem";
+import Telem from "./FlightControlsGCS";
 import { Toaster } from "@/components/ui/sonner";
-import ThreeDWorld from "./ThreeDWorld";
+import ThreeDWorld from "./TacticalWorldGCS";
 const SOCKET_URL = `https://${location.hostname}`; // Adjust if your server runs on a different port
 import io, { Socket } from "socket.io-client";
-import GameMap from "./GameMap";
+import GameMap from "./TacticalRadarGCS";
 
 function App() {
   const [isReady, setIsReady] = useState(false);
@@ -25,6 +25,7 @@ function App() {
     skt.on("loading", (data) => setLoading(data));
 
     skt.on("connect", () => {
+      setLoading({ percent: 5, stage: "Connecting to simulator" });
       setSocket(skt);
     });
   }, []);
@@ -40,12 +41,20 @@ function App() {
 
       <Card className="relative w-screen h-screen p-0 rounded-none border-none">
         {!isReady && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black">
-            <div className="text-center space-y-6">
+          <div className="loading-screen absolute inset-0 z-50 flex items-center justify-center bg-black">
+            <div className="loading-card text-center">
+              <div className="loading-eyebrow">SKY//OPS FLIGHT LAB</div>
+              <h1>Browser-based drone simulation</h1>
+              <p className="loading-intro">Fly a PX4-powered quadcopter in a live 3D environment with real telemetry, offboard control, and a ground-control-style HUD.</p>
+              <div className="loading-features">
+                <span><b>W / S</b> Altitude</span>
+                <span><b>A / D</b> Heading</span>
+                <span><b>ARROWS</b> Pitch &amp; roll</span>
+              </div>
               <div className="loading-orbit"><div /></div>
-              <p className="text-white text-lg tracking-wide">{loading.stage}</p>
+              <p className="loading-stage">{loading.stage}</p>
               <div className="loading-progress"><div style={{ width: `${loading.percent}%` }} /></div>
-              <div className="loading-meta"><span>{loading.percent}%</span><span>PX4 / GAZEBO HARMONIC</span></div>
+              <div className="loading-meta"><span>{loading.percent}%</span><span>PX4 SITL / FLIGHT SYSTEMS</span></div>
             </div>
           </div>
         )}

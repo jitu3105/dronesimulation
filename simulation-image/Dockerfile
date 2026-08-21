@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
 # Define mount points for persistent data. Use absolute paths within the container.
 VOLUME [ "/data", "/backend/simulation" ]
@@ -28,7 +28,7 @@ WORKDIR /opt/px4
 
 # Clone PX4 source code recursively into the current working directory (/opt/px4).
 # This will create /opt/px4/PX4-Autopilot.
-RUN git clone https://github.com/PX4/PX4-Autopilot.git --recursive
+RUN git clone --recursive https://github.com/PX4/PX4-Autopilot.git
 
 # Now, change the working directory specifically to the cloned PX4-Autopilot repository.
 # All subsequent commands will be executed from within /opt/px4/PX4-Autopilot.

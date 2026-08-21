@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { HashLoader, RingLoader } from "react-spinners";
+import { HashLoader } from "react-spinners";
 
 import { toast } from "sonner";
 

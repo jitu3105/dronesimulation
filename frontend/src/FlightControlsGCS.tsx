@@ -290,7 +290,7 @@ const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
             size={150}
             sticky
             baseColor="rgba(255,255,255,0.05)"
-            stickColor="#3b82f6"
+            stickColor="#397cac"
             throttle={200}
             controlPlaneShape={JoystickShape.Square}
             move={handleLeftMove}
@@ -307,7 +307,7 @@ const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
             size={150}
             sticky
             baseColor="rgba(255,255,255,0.05)"
-            stickColor="#22c55e"
+            stickColor="#438f68"
             throttle={200}
             controlPlaneShape={JoystickShape.Square}
             move={handleRightMove}

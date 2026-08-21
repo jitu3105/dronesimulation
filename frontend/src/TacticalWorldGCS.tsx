@@ -1,6 +1,6 @@
 import React, { memo, Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useGLTF, Sky } from "@react-three/drei";
+import { useGLTF, useTexture } from "@react-three/drei";
 import {
   Group,
   Object3D,
@@ -8,36 +8,34 @@ import {
   Euler,
   Quaternion,
   InstancedMesh,
+  MirroredRepeatWrapping,
+  SRGBColorSpace,
 } from "three";
 useGLTF.preload("/drone.glb");
+useTexture.preload("/terrain-range-v2.png");
 const ThreeDWorld: React.FC<{ state: any }> = ({ state }) => {
   return (
     <Canvas
-      style={{ background: "#87CEEB" }}
+      style={{ background: "linear-gradient(180deg, #58778f 0%, #91a8b3 42%, #b1bbb4 55%, #758070 100%)" }}
       shadows={false}
       gl={{ antialias: false, powerPreference: "high-performance" }}
       dpr={1}
       camera={{ fov: 60 }}
     >
-      <Sky
-        distance={1000}
-        sunPosition={[100, 20, 100]}
-        inclination={0}
-        azimuth={0.25}
-      />
-      <fog attach="fog" args={["#8aa2ad", 180, 760]} />
+      <fog attach="fog" args={["#9aa9a4", 160, 680]} />
 
       <Suspense fallback={null}>
         <DroneModel state={state} />
+        <Ground />
       </Suspense>
 
-      <ambientLight intensity={0.4} />
+      <ambientLight intensity={0.34} />
+      <hemisphereLight args={["#b9d1dd", "#4d554b", 0.58]} />
       <directionalLight
         position={[100, 100, 100]}
         intensity={1}
       />
 
-      <Ground />
       <RepeatingLandmarks />
     </Canvas>
   );
@@ -205,7 +203,7 @@ const DroneModel: React.FC<{ state: any }> = ({ state }) => {
   });
 
   return (
-    <group ref={sceneRef} scale={2.2}>
+    <group ref={sceneRef} scale={1.85}>
       <primitive object={scene} rotation={[0, Math.PI, 0]} />
     </group>
   );
@@ -215,13 +213,24 @@ const MemoisedThreeDWorld = memo(ThreeDWorld);
 export default MemoisedThreeDWorld;
 
 const Ground = () => {
+  const terrain = useTexture("/terrain-range-v2.png");
+  terrain.wrapS = MirroredRepeatWrapping;
+  terrain.wrapT = MirroredRepeatWrapping;
+  terrain.repeat.set(72, 72);
+  terrain.colorSpace = SRGBColorSpace;
+  terrain.anisotropy = 4;
+  terrain.needsUpdate = true;
+
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[10000, 10000]} />
-        <meshStandardMaterial color="#53624d" roughness={.96} metalness={0} />
+        <meshStandardMaterial map={terrain} color="#aeb3a7" roughness={.98} metalness={0} />
       </mesh>
-      <gridHelper args={[10000, 500, "#91a080", "#667262"]} position={[0,.018,0]} />
+      <gridHelper args={[10000, 250, "#81917d", "#556256"]} position={[0,.018,0]} />
+      <mesh position={[0,.035,-120]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[18,220]} /><meshStandardMaterial color="#31383a" roughness={.94} /></mesh>
+      <mesh position={[0,.045,-120]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[.35,184]} /><meshBasicMaterial color="#d0c59b" /></mesh>
+      <mesh position={[-78,.03,12]} rotation={[-Math.PI/2,0,.42]}><planeGeometry args={[7,290]} /><meshStandardMaterial color="#5f625b" roughness={1} /></mesh>
       <mesh position={[35,.045,-15]} rotation={[-Math.PI/2,0,0]}><circleGeometry args={[12,48]} /><meshStandardMaterial color="#30383a" /></mesh>
       <mesh position={[35,.07,-15]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[9.5,10,48]} /><meshBasicMaterial color="#d7e098" /></mesh>
       {[[45,45],[-45,45],[45,-45],[-45,-45]].map(([x,z],i) => <mesh key={i} position={[x,1.5,z]}><cylinderGeometry args={[.18,.18,3,8]} /><meshBasicMaterial color="#ffb84d" /></mesh>)}
@@ -240,8 +249,8 @@ const RepeatingLandmarks = () => {
     if (!towerRef.current || !markerRef.current || !trunkRef.current || !crownRef.current) return;
     const transform = new Object3D();
     let index = 0;
-    for (let x = -3; x <= 3; x += 1) {
-      for (let z = -3; z <= 3; z += 1) {
+    for (let x = -2; x <= 2; x += 1) {
+      for (let z = -2; z <= 2; z += 1) {
         const height = 3 + ((Math.abs(x * 7 + z * 11) % 5) * 1.8);
         transform.position.set(x * 130 + 55, height / 2, z * 130 + 35);
         transform.scale.set(1, height, 1);
@@ -257,7 +266,7 @@ const RepeatingLandmarks = () => {
     towerRef.current.instanceMatrix.needsUpdate = true;
     markerRef.current.instanceMatrix.needsUpdate = true;
 
-    for (let i = 0; i < 96; i += 1) {
+    for (let i = 0; i < 36; i += 1) {
       const x = ((i * 83) % 880) - 440;
       const z = ((i * 151) % 880) - 440;
       const height = 3.5 + ((i * 17) % 5);
@@ -282,19 +291,19 @@ const RepeatingLandmarks = () => {
 
   return (
     <group ref={groupRef}>
-      <instancedMesh ref={towerRef} args={[undefined, undefined, 49]}>
+      <instancedMesh ref={towerRef} args={[undefined, undefined, 25]}>
         <boxGeometry args={[5, 1, 5]} />
         <meshStandardMaterial color="#506673" roughness={.82} />
       </instancedMesh>
-      <instancedMesh ref={markerRef} args={[undefined, undefined, 49]} rotation={[-Math.PI / 2, 0, 0]}>
+      <instancedMesh ref={markerRef} args={[undefined, undefined, 25]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[5, 6, 20]} />
         <meshBasicMaterial color="#c8a75a" />
       </instancedMesh>
-      <instancedMesh ref={trunkRef} args={[undefined, undefined, 96]}>
+      <instancedMesh ref={trunkRef} args={[undefined, undefined, 36]}>
         <cylinderGeometry args={[.35,.5,1,6]} />
         <meshStandardMaterial color="#594b36" roughness={1} />
       </instancedMesh>
-      <instancedMesh ref={crownRef} args={[undefined, undefined, 96]}>
+      <instancedMesh ref={crownRef} args={[undefined, undefined, 36]}>
         <coneGeometry args={[1,1,7]} />
         <meshStandardMaterial color="#315f48" roughness={.96} />
       </instancedMesh>

@@ -190,6 +190,12 @@ async def on_startup():
         try:
             drone = await wait_for_sim_connection()
             logger.info("========drone connected=======")
+            await drone.offboard.set_velocity_body(VelocityBodyYawspeed(0, 0, 0, 0))
+            try:
+                await drone.offboard.start()
+                logger.info("✅ Offboard mode initialized")
+            except Exception as offboard_error:
+                logger.error(f"❌ Offboard initialization failed: {offboard_error}")
             commandListenerAsync= asyncio.create_task(command_listener())
             streamTelemAsync= asyncio.create_task(streamTelem(drone=drone,logger=logger,redis=r,droneId=droneId))
         except TimeoutError as e:

@@ -7,7 +7,7 @@ const GameMap: React.FC<{ state: any }> = ({ state }) => {
       heading: Number(state.current?.heading ?? state.current?.yaw_deg ?? 0),
       lat: Number(state.current?.lat),
       lon: Number(state.current?.lon),
-    }), 250);
+    }), 400);
     return () => window.clearInterval(timer);
   }, [state]);
 

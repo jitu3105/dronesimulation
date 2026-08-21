@@ -107,6 +107,15 @@ async def telem_listener(sio):
         await pubsub.close()
 
 
+async def startup_progress(sid):
+    await asyncio.sleep(1)
+    await sio.emit("loading", {"percent": 35, "stage": "Loading Gazebo world"}, room=sid)
+    await asyncio.sleep(2)
+    await sio.emit("loading", {"percent": 70, "stage": "Initializing flight telemetry"}, room=sid)
+    await asyncio.sleep(2)
+    await sio.emit("loading", {"percent": 85, "stage": "Waiting for flight telemetry"}, room=sid)
+
+
 @sio.event
 async def connect(sid, environ):
     logger.info(f"Socket connected: {sid}")
@@ -131,7 +140,8 @@ async def connect(sid, environ):
             },
         )
         await sio.emit("loading", {"percent": 20, "stage": "Simulator container started"}, room=sid)
-        await sio.emit("loading", {"percent": 45, "stage": "Starting PX4 flight controller"}, room=sid)
+        await sio.emit("loading", {"percent": 25, "stage": "Starting PX4 flight controller"}, room=sid)
+        asyncio.create_task(startup_progress(sid))
     except Exception as e:
         logger.error(e)
         await sio.emit("loading", {"percent": 100, "stage": "Simulator failed to start", "error": True}, room=sid)
@@ -161,7 +171,6 @@ async def move(sid,data):
     
 
 
-@sio.event
 async def message(sid, data):
     logger.info(f"Message from {sid}: {data}")
     await sio.emit("message", f"Echo: {data}")

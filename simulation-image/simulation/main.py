@@ -98,8 +98,8 @@ async def command_listener():
                         armed=fetchArmed()
                         if not armed:
                             print(data["dwn"] ,data["yaw"])
-                            # The UI maps throttle-up to a positive dwn value.
-                            if data["dwn"] > 1.5 :
+                            # PX4 body Z is NED: throttle-up is a negative dwn value.
+                            if data["dwn"] < -1.5 :
                                 await drone.action.arm()
                             # if data["dwn"] > 1.5 and data["yaw"] < -15:
                             #     await drone.action.disarm()

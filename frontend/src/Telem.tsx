@@ -67,8 +67,9 @@ const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
 
   const handleLeftMove = (data: any) => {
     emitMove({
-      dwn: clamp(-data.y * 2),
-      yaw: clamp(data.x * 20),
+      // Flip the joystick's vertical axis: pushing up must command climb.
+      dwn: clamp(data.y * 3, -3, 3),
+      yaw: clamp(data.x * 35, -35, 35),
     });
   };
 
@@ -90,8 +91,8 @@ const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
 
   const handleRightMove = (data: any) => {
     emitMove({
-      fwd: clamp(data.y * 5),
-      rgt: clamp(data.x * 5),
+      fwd: clamp(data.y * 8, -8, 8),
+      rgt: clamp(data.x * 8, -8, 8),
     });
   };
 
@@ -130,10 +131,10 @@ const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
       const roll = (keyboardState.ArrowRight ? 1 : 0) - (keyboardState.ArrowLeft ? 1 : 0);
 
       emitMove({
-        dwn: throttle * 2,
-        yaw: yaw * 20,
-        fwd: pitch * 5,
-        rgt: roll * 5,
+        dwn: -throttle * 3,
+        yaw: yaw * 35,
+        fwd: pitch * 8,
+        rgt: roll * 8,
       });
     };
 

@@ -118,6 +118,7 @@ async def connect(sid, environ):
     droneId=sid
     container_name = f"drone-sim-{sid}"
     logger.info(container_name)
+    await sio.emit("loading", {"percent": 5, "stage": "Connecting to simulator"}, room=sid)
     try:
         client.containers.run(
             image="px4-typhoon",
@@ -129,8 +130,11 @@ async def connect(sid, environ):
                 "DRONE_ID": droneId
             },
         )
+        await sio.emit("loading", {"percent": 20, "stage": "Simulator container started"}, room=sid)
+        await sio.emit("loading", {"percent": 45, "stage": "Starting PX4 flight controller"}, room=sid)
     except Exception as e:
         logger.error(e)
+        await sio.emit("loading", {"percent": 100, "stage": "Simulator failed to start", "error": True}, room=sid)
 
 
 

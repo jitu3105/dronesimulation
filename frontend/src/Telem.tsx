@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Joystick, JoystickShape } from "react-joystick-component";
 import { toast } from "sonner";
 import type { Socket } from "socket.io-client";
@@ -7,6 +7,7 @@ const clamp = (value: number, min = -1, max = 1) =>
   Math.min(Math.max(value, min), max);
 
 const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
+  const [, refreshHud] = useState(0);
   const leftJoySitckRef = useRef<Joystick>(null);
   const rightJoySitckRef = useRef<Joystick>(null);
 
@@ -30,7 +31,8 @@ const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
 
   useEffect(() => {
     const telemUpdater = (data: any) => {
-      state.current = { ...state.current, ...data };
+      state.current = { ...state.current, ...data, lastUpdate: Date.now() };
+      refreshHud((value) => value + 1);
     };
 
     const statusUpdater = (data: any) => {
@@ -178,6 +180,12 @@ const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
   const msl = Number(state.current?.msl ?? 0);
   const mode = state.current?.mode ?? "---";
   const armed = Boolean(state.current?.armed);
+  const roll = Number(state.current?.roll_deg ?? 0);
+  const pitch = Number(state.current?.pitch_deg ?? 0);
+  const yaw = Number(state.current?.yaw_deg ?? state.current?.heading ?? 0);
+  const connectionAge = state.current?.lastUpdate
+    ? Math.max(0, (Date.now() - state.current.lastUpdate) / 1000)
+    : 0;
 
   return (
     <>
@@ -192,6 +200,29 @@ const Telem: React.FC<{ state: any; socket: Socket }> = ({ state, socket }) => {
           <div className="hud-chip hud-chip--mode"><span>FLIGHT MODE</span><strong>{mode}</strong></div>
           <div className="hud-chip"><span>AGL</span><strong>{Math.max(agl, 0).toFixed(0)}<em> m</em></strong></div>
           <div className="hud-chip"><span>MSL</span><strong>{Math.max(msl, 0).toFixed(0)}<em> m</em></strong></div>
+        </div>
+
+        <div className="attitude-panel">
+          <div className="panel-title"><span>ATTITUDE</span><small>LIVE / 10 HZ</small></div>
+          <div className="attitude-values">
+            <div><span>ROLL</span><strong>{roll.toFixed(1)}°</strong></div>
+            <div><span>PITCH</span><strong>{pitch.toFixed(1)}°</strong></div>
+            <div><span>YAW</span><strong>{yaw.toFixed(1)}°</strong></div>
+          </div>
+          <div className="artificial-horizon" style={{ transform: `rotate(${-roll}deg)` }}>
+            <div className="horizon-pitch" style={{ transform: `translateY(${pitch * 1.2}px)` }} />
+            <div className="horizon-marker" />
+          </div>
+        </div>
+
+        <div className="telemetry-panel">
+          <div className="panel-title"><span>SYSTEM TELEMETRY</span><small>{connectionAge < 2 ? "LINK OK" : "NO DATA"}</small></div>
+          <div className="telemetry-grid">
+            <div><span>GPS</span><strong>{state.current?.lat ? `${Number(state.current.lat).toFixed(5)}, ${Number(state.current.lon).toFixed(5)}` : "—"}</strong></div>
+            <div><span>HEADING</span><strong>{Number(state.current?.heading ?? yaw).toFixed(0)}°</strong></div>
+            <div><span>STATUS</span><strong>{armed ? "ARMED" : "STANDBY"}</strong></div>
+            <div><span>LINK</span><strong>{state.current?.lastUpdate ? "CONNECTED" : "WAITING"}</strong></div>
+          </div>
         </div>
 
         <div className="hud-left">

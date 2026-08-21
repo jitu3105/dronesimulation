@@ -98,7 +98,8 @@ async def command_listener():
                         armed=fetchArmed()
                         if not armed:
                             print(data["dwn"] ,data["yaw"])
-                            if data["dwn"] < -1.5 :
+                            # The UI maps throttle-up to a positive dwn value.
+                            if data["dwn"] > 1.5 :
                                 await drone.action.arm()
                             # if data["dwn"] > 1.5 and data["yaw"] < -15:
                             #     await drone.action.disarm()
@@ -107,7 +108,11 @@ async def command_listener():
                         if mode != "OFFBOARD":
                             velocities=VelocityBodyYawspeed(0,0,0, 0)
                             await drone.offboard.set_velocity_body(velocities)
-                            await drone.offboard.start()
+                            try:
+                                await drone.offboard.start()
+                            except Exception as offboard_error:
+                                logger.error(f"Offboard start failed: {offboard_error}")
+                                continue
                         velocities=VelocityBodyYawspeed(data["fwd"],data["rgt"],data["dwn"],data["yaw"])
                         await drone.offboard.set_velocity_body(velocities)
                     except json.JSONDecodeError:
@@ -174,7 +179,7 @@ async def on_startup():
     global streamTelemAsync
     try:
         r = redis.Redis(host="dronesim-redis", port=6379, db=0)
-        r.ping()
+        await r.ping()
         logger.success("✅ Redis connected")
     except Exception as e:
         logger.error(f"❌ Redis connection error: {e}")

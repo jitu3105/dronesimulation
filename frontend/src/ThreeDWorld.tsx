@@ -208,7 +208,7 @@ const DroneModel: React.FC<{ state: any }> = ({ state }) => {
   });
 
   return (
-    <group ref={sceneRef}>
+    <group ref={sceneRef} scale={3}>
       <primitive object={scene} rotation={[0, Math.PI, 0]} />
     </group>
   );

@@ -10,6 +10,7 @@ import GameMap from "./GameMap";
 
 function App() {
   const [isReady, setIsReady] = useState(false);
+  const [loading, setLoading] = useState({ percent: 0, stage: "Connecting" });
   const [socket, setSocket] = useState<Socket>();
   useEffect(() => {
     // const a = new Set();
@@ -18,8 +19,10 @@ function App() {
       transports: ["websocket"], // Optional, avoid long-polling
     });
     skt.once("telem", () => {
+      setLoading({ percent: 100, stage: "Flight systems online" });
       setIsReady(true);
     });
+    skt.on("loading", (data) => setLoading(data));
 
     skt.on("connect", () => {
       setSocket(skt);
@@ -39,10 +42,10 @@ function App() {
         {!isReady && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black">
             <div className="text-center space-y-6">
-              <div className="h-16 w-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
-              <p className="text-white text-lg tracking-wide">
-                Spawning Simulation...
-              </p>
+              <div className="loading-orbit"><div /></div>
+              <p className="text-white text-lg tracking-wide">{loading.stage}</p>
+              <div className="loading-progress"><div style={{ width: `${loading.percent}%` }} /></div>
+              <div className="loading-meta"><span>{loading.percent}%</span><span>PX4 / GAZEBO HARMONIC</span></div>
             </div>
           </div>
         )}

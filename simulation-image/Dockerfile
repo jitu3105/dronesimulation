@@ -42,13 +42,13 @@ WORKDIR /opt/px4/PX4-Autopilot
 RUN bash ./Tools/setup/ubuntu.sh
 
 
-RUN DONT_RUN=1 make px4_sitl gazebo-classic_typhoon_h480
+RUN make px4_sitl_default
 
-RUN pip3 install docker>=7.1.0 fastapi>=0.116.1 loguru>=0.7.3 mavsdk==2.6.0  redis uvicorn>=0.35.0 mavproxy conan>2.0
+RUN pip3 install --break-system-packages docker>=7.1.0 fastapi>=0.116.1 loguru>=0.7.3 mavsdk==2.6.0  redis uvicorn>=0.35.0 mavproxy conan>2.0
 
 WORKDIR  /opt
 
-RUN  cp /usr/local/lib/python3.8/dist-packages/mavsdk/bin/mavsdk_server /usr/local/bin/
+RUN MAVSDK_SERVER_PATH=$(find /usr/local/lib /usr/lib -path "*/mavsdk/bin/mavsdk_server" -type f -print -quit) && test -n "$MAVSDK_SERVER_PATH" && cp "$MAVSDK_SERVER_PATH" /usr/local/bin/mavsdk_server
 
 RUN apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-x gstreamer1.0-alsa gstreamer1.0-gl gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio gstreamer1.0-rtsp  python3-gi gir1.2-gst-plugins-base-1.0 xvfb
 
